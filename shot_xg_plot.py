@@ -8,8 +8,11 @@ from matplotlib.transforms import Affine2D
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 import networkx as nx
+# Installation issue solved with https: // github.com/coqui-ai/TTS/issues/1808
+from statsbombpy import sb
 
 # TODO add paths and pitch dimensions
+match_id = 3788750
 save_path = '/home/patrick/ownCloud/Football Analytics/output/'
 events_path = '/home/patrick/ownCloud/Football Analytics/sample_data/events_statsbomb.json'
 lineup_path = '/home/patrick/ownCloud/Football Analytics/sample_data/lineups_statsbomb.json'
@@ -25,28 +28,25 @@ def get_json(path):
 
 def prep_data(events_path, lineup_path, pitch_length, pitch_width, orient_vertical=False):
     # load datasets into dataframes
-    events = pd.json_normalize(get_json(events_path))
+    # events = pd.json_normalize(get_json(events_path))
     lineup = pd.json_normalize(get_json(lineup_path))
     lineup = pd.concat([pd.json_normalize(lineup['lineup'][0]),
                        pd.json_normalize(lineup['lineup'][1])])
-
-    # filter for shots
-    shots = events[events['type.name'] == 'Shot']
+    shots = sb.events(match_id, split=True)["shots"]
 
     # extract and rename necessary columns
-    shots = shots[['location', 'shot.statsbomb_xg', 'shot.outcome.name',
-                   'possession_team.name', 'minute', 'player.id', 'player.name']]
+    shots = shots[['location', 'shot_statsbomb_xg', 'shot_outcome',
+                   'possession_team', 'minute', 'player_id', 'player']]
     shots = shots.rename(
-        columns={'shot.statsbomb_xg': 'xg', 'possession_team.name': 'team'})
+        columns={'shot_statsbomb_xg': 'xg', 'possession_team': 'team'})
     lineup = lineup[['player_id', 'player_nickname']]
 
     # calculate missing columns
-    shots['isGoal'] = shots['shot.outcome.name'] == 'Goal'
+    shots['isGoal'] = shots['shot_outcome'] == 'Goal'
     shots['x'], shots['y'] = zip(*shots['location'])
-    shots = pd.merge(shots, lineup, left_on='player.id', right_on='player_id')
-    shots['player.name'] = shots['player_nickname'].fillna(
-        shots['player.name'])
-    shots['info'] = shots['player.name'].str.split().str[-1] + ' ' + \
+    shots = pd.merge(shots, lineup, on='player_id')
+    shots['player'] = shots['player_nickname'].fillna(shots['player'])
+    shots['info'] = shots['player'].str.split().str[-1] + ' ' + \
         shots['minute'].map(str) + '\''
 
     # normalize coordinates
