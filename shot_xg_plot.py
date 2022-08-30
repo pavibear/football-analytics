@@ -16,37 +16,38 @@ lineup_path = '/home/patrick/ownCloud/Football Analytics/sample_data/lineups_sta
 pitch_length = 105
 pitch_width = 68
 
+
 def get_json(path):
     with open(path, encoding='utf8') as f:
         js = json.load(f)
         return js
 
-def prep_data(events_path, lineup_path,
-              pitch_length, pitch_width, orient_vertical=False):
+
+def prep_data(events_path, lineup_path, pitch_length, pitch_width, orient_vertical=False):
     # load datasets into dataframes
     events = pd.json_normalize(get_json(events_path))
     lineup = pd.json_normalize(get_json(lineup_path))
     lineup = pd.concat([pd.json_normalize(lineup['lineup'][0]),
-                           pd.json_normalize(lineup['lineup'][1])])
+                       pd.json_normalize(lineup['lineup'][1])])
 
     # filter for shots
     shots = events[events['type.name'] == 'Shot']
 
     # extract and rename necessary columns
     shots = shots[['location', 'shot.statsbomb_xg', 'shot.outcome.name',
-                         'possession_team.name', 'minute', 'player.id', 'player.name']]
-    shots = shots.rename(columns={'shot.statsbomb_xg': 'xg',
-                                        'possession_team.name': 'team'})
+                   'possession_team.name', 'minute', 'player.id', 'player.name']]
+    shots = shots.rename(
+        columns={'shot.statsbomb_xg': 'xg', 'possession_team.name': 'team'})
     lineup = lineup[['player_id', 'player_nickname']]
 
     # calculate missing columns
     shots['isGoal'] = shots['shot.outcome.name'] == 'Goal'
     shots['x'], shots['y'] = zip(*shots['location'])
-    shots = pd.merge(shots, lineup,
-                        left_on='player.id', right_on='player_id')
-    shots['player.name'] = shots['player_nickname'].fillna(shots['player.name'])
-    shots['info'] = shots['player.name'].str.split(
-    ).str[-1] + ' ' + shots['minute'].map(str) + '\''
+    shots = pd.merge(shots, lineup, left_on='player.id', right_on='player_id')
+    shots['player.name'] = shots['player_nickname'].fillna(
+        shots['player.name'])
+    shots['info'] = shots['player.name'].str.split().str[-1] + ' ' + \
+        shots['minute'].map(str) + '\''
 
     # normalize coordinates
     shots['x'] = shots['x'] * pitch_length / 120
@@ -194,6 +195,8 @@ def draw_pitch(
     ax.add_patch(right_arc)
 
 # Source: https://stackoverflow.com/questions/14938541/how-to-improve-the-label-placement-for-matplotlib-scatter-chart-code-algorithm
+
+
 def repel_labels(ax, x, y, labels, k=0.01):
     G = nx.DiGraph()
     data_nodes = []
@@ -262,7 +265,8 @@ def scatter_shots(
     if print_info:
         repel_labels(ax, data['x'], data['y'], data['info'], k=1.5)
 
-def add_xg_legend(ax: Axes, title, shot_size_factor, bbox_to_anchor = (0,1)):
+
+def add_xg_legend(ax: Axes, title, shot_size_factor, bbox_to_anchor=(0, 1)):
     # choose different xg values to show
     xg_labels = [0.05, 0.25, 0.5]
 
@@ -371,7 +375,8 @@ def comparison_plot(
 
     plt.savefig(save_path+'plot_shots_comparison.png', bbox_inches='tight')
 
-# plots by provider
+
+# actual plotting
 orient_vertical = True
 shots = prep_data(events_path, lineup_path, pitch_length, pitch_width,
                   orient_vertical=orient_vertical)
