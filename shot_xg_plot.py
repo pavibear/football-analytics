@@ -9,68 +9,59 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 import networkx as nx
 
+# TODO add paths and pitch dimensions
+save_path = '/home/patrick/ownCloud/Football Analytics/output/'
+events_path = '/home/patrick/ownCloud/Football Analytics/sample_data/events_statsbomb.json'
+lineup_path = '/home/patrick/ownCloud/Football Analytics/sample_data/lineups_statsbomb.json'
+pitch_length = 105
+pitch_width = 68
+
 def get_json(path):
     with open(path, encoding='utf8') as f:
         js = json.load(f)
         return js
 
-def prep_data(events_wyscout_path, events_statsbomb_path, lineup_statsbomb_path,
+def prep_data(events_path, lineup_path,
               pitch_length, pitch_width, orient_vertical=False):
     # load datasets into dataframes
-    wyscout = pd.json_normalize(get_json(events_wyscout_path)['events'])
-    statsbomb = pd.json_normalize(get_json(events_statsbomb_path))
-    lineup_sb = pd.json_normalize(get_json(lineup_statsbomb_path))
-    lineup_sb = pd.concat([pd.json_normalize(lineup_sb['lineup'][0]),
-                           pd.json_normalize(lineup_sb['lineup'][1])])
+    events = pd.json_normalize(get_json(events_path))
+    lineup = pd.json_normalize(get_json(lineup_path))
+    lineup = pd.concat([pd.json_normalize(lineup['lineup'][0]),
+                           pd.json_normalize(lineup['lineup'][1])])
 
     # filter for shots
-    shots_wy = wyscout[((wyscout['type.primary'] == 'shot') | (
-        wyscout['type.primary'] == 'penalty'))]
-    shots_sb = statsbomb[statsbomb['type.name'] == 'Shot']
+    shots = events[events['type.name'] == 'Shot']
 
     # extract and rename necessary columns
-    shots_wy = shots_wy[['location.x', 'location.y', 'shot.xg', 'team.name',
-                         'shot.isGoal', 'minute', 'player.name']]
-    shots_wy = shots_wy.rename(columns={'location.x': 'x', 'location.y': 'y',
-                                        'shot.xg': 'xg', 'team.name': 'team',
-                                        'shot.isGoal': 'isGoal'})
-    shots_sb = shots_sb[['location', 'shot.statsbomb_xg', 'shot.outcome.name',
+    shots = shots[['location', 'shot.statsbomb_xg', 'shot.outcome.name',
                          'possession_team.name', 'minute', 'player.id', 'player.name']]
-    shots_sb = shots_sb.rename(columns={'shot.statsbomb_xg': 'xg',
+    shots = shots.rename(columns={'shot.statsbomb_xg': 'xg',
                                         'possession_team.name': 'team'})
-    lineup_sb = lineup_sb[['player_id', 'player_nickname']]
+    lineup = lineup[['player_id', 'player_nickname']]
 
     # calculate missing columns
-    shots_wy['info'] = shots_wy['player.name'].str.split(
-    ).str[-1] + ' ' + shots_wy['minute'].map(str) + '\''
-    shots_sb['isGoal'] = shots_sb['shot.outcome.name'] == 'Goal'
-    shots_sb['x'], shots_sb['y'] = zip(*shots_sb['location'])
-    shots_sb = pd.merge(shots_sb, lineup_sb,
+    shots['isGoal'] = shots['shot.outcome.name'] == 'Goal'
+    shots['x'], shots['y'] = zip(*shots['location'])
+    shots = pd.merge(shots, lineup,
                         left_on='player.id', right_on='player_id')
-    shots_sb['player.name'] = shots_sb['player_nickname'].fillna(shots_sb['player.name'])
-    shots_sb['info'] = shots_sb['player.name'].str.split(
-    ).str[-1] + ' ' + shots_sb['minute'].map(str) + '\''
+    shots['player.name'] = shots['player_nickname'].fillna(shots['player.name'])
+    shots['info'] = shots['player.name'].str.split(
+    ).str[-1] + ' ' + shots['minute'].map(str) + '\''
 
     # normalize coordinates
-    shots_wy['x'] = shots_wy['x'] * pitch_length / 100
-    shots_wy['y'] = pitch_width - shots_wy['y'] * pitch_width / 100
-    shots_sb['x'] = shots_sb['x'] * pitch_length / 120
-    shots_sb['y'] = pitch_width - shots_sb['y'] * pitch_width / 80
+    shots['x'] = shots['x'] * pitch_length / 120
+    shots['y'] = pitch_width - shots['y'] * pitch_width / 80
 
     # unify column selection and indexing
-    shots_wy = shots_wy[['x', 'y', 'xg', 'team', 'isGoal', 'info']]
-    shots_wy = shots_wy.reset_index(drop=True)
-    shots_sb = shots_sb[['x', 'y', 'xg', 'team', 'isGoal', 'info']]
-    shots_sb = shots_sb.reset_index(drop=True)
+    shots = shots[['x', 'y', 'xg', 'team', 'isGoal', 'info']]
+    shots = shots.reset_index(drop=True)
 
     # switch 'x' and 'y' for orient_vertical
     if orient_vertical:
-        shots_wy = shots_wy.rename(columns={'x': 'y', 'y': 'x'})
-        shots_wy['x'] = pitch_width - shots_wy['x']
-        shots_sb = shots_sb.rename(columns={'x': 'y', 'y': 'x'})
-        shots_sb['x'] = pitch_width - shots_sb['x']
+        shots = shots.rename(columns={'x': 'y', 'y': 'x'})
+        shots['x'] = pitch_width - shots['x']
 
-    return shots_wy, shots_sb
+    return shots
 
 
 def draw_pitch(
@@ -320,7 +311,7 @@ def shot_plot(
     x = 'y' if orient_vertical else 'x'
     y = 'x' if orient_vertical else 'y'
     dist_center = max(
-        16.5 + 7.32 / 2, np.max(abs(shots_wy[y] - pitch_width / 2)))
+        16.5 + 7.32 / 2, np.max(abs(shots[y] - pitch_width / 2)))
     dist_groundline = max(11 + 9.15, np.min(data[x]))
     xlim = [dist_groundline * (1 - buffer), pitch_length * 1.07]
     ylim = [(pitch_width / 2 - dist_center) * (1 - buffer),
@@ -380,30 +371,10 @@ def comparison_plot(
 
     plt.savefig(save_path+'plot_shots_comparison.png', bbox_inches='tight')
 
-
-# TODO add paths and pitch dimensions
-save_path = '/home/patrick/ownCloud/17_Soccer Analytics/uefa-euro-2020/analysis/plots/'
-events_wyscout_path = '/home/patrick/ownCloud/17_Soccer Analytics/uefa-euro-2020/data/match09/events_wyscout.json'
-events_statsbomb_path = '/home/patrick/ownCloud/17_Soccer Analytics/uefa-euro-2020/data/match09/events_statsbomb.json'
-lineup_statsbomb_path = '/home/patrick/ownCloud/17_Soccer Analytics/uefa-euro-2020/data/match09/lineups_statsbomb.json'
-pitch_length = 105
-pitch_width = 68
-
 # plots by provider
 orient_vertical = True
-shots_wy, shots_sb = prep_data(events_wyscout_path, events_statsbomb_path,
-                               lineup_statsbomb_path, pitch_length, pitch_width,
-                               orient_vertical=orient_vertical)
-shot_plot(shots_wy, name_provider='Wyscout', orient_vertical=orient_vertical)
-shot_plot(shots_sb, name_provider='Statsbomb', orient_vertical=orient_vertical)
+shots = prep_data(events_path, lineup_path, pitch_length, pitch_width,
+                  orient_vertical=orient_vertical)
+shot_plot(shots, name_provider='Statsbomb', orient_vertical=orient_vertical)
 
-# comparison plot
-orient_vertical = False
-shots_wy, shots_sb = prep_data(events_wyscout_path, events_statsbomb_path,
-                               lineup_statsbomb_path, pitch_length, pitch_width,
-                               orient_vertical=orient_vertical)
-comparison_plot(shots_wy, shots_sb, name_provider1='Wyscout',
-                name_provider2='Statsbomb')
-
-print(shots_wy)
-print(shots_sb)
+print(shots)
