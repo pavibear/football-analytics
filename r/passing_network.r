@@ -5,16 +5,14 @@ library(ggpubr)
 library(ggsoccer)
 library(grid)
 library(rjson)
+library(StatsBombR)
+library(tidyr)
+library(rjson)
 
 rm(list = ls())
 
 ### Declaring constants ###
 
-# global paths to source files
-statsbomb_event_path <-
-  "/home/patrick/ownCloud/17_Soccer Analytics/uefa-euro-2020/data/match09/events_statsbomb.json"
-statsbomb_lineups_path <-
-  "/home/patrick/ownCloud/17_Soccer Analytics/uefa-euro-2020/data/match09/lineups_statsbomb.json"
 # pitch dimensions
 pitch_length <- 105
 pitch_width <- 68
@@ -25,35 +23,37 @@ player_threshold <- 0.015
 incl_passers <- 1
 incl_recipients <- 1
 
-### Import data ###
+### Import data ----
 
-match <- fromJSON(file = statsbomb_event_path)
-match <-
-  lapply(match, function(x)
-    data.frame(t(unlist(x)), stringsAsFactors = FALSE))
-match <- rbindlist(match, fill = TRUE)
+match_id = 3788750
+
+comp <- FreeCompetitions()
+matches <- FreeMatches(comp)
+row_nr = which(matches[,1] == match_id)
+match <- get.matchFree(matches[row_nr,])
+lineup <- get.lineupsFree(matches[row_nr,])
+lineup <- rbind(lineup$lineup[[1]], lineup$lineup[[2]])
 teams <- unique(match$team.name)
-lineup <- fromJSON(file = statsbomb_lineups_path)
-lineup <- rbind(lineup[[1]][[3]], lineup[[2]][[3]])
-lineup <-
-  lapply(lineup, function(x)
-    data.frame(t(unlist(x)), stringsAsFactors = FALSE))
-lineup <- rbindlist(lineup, fill = TRUE)[, 1:6]
 
-### Extract passing information ###
+### Extract passing information ----
 
 # filter events to get passes only
 passes <- match[match$type.name == "Pass", ]
+# unlist location info
+passes$x_start <- lapply(passes$location, (function (x) x[1]))
+passes$y_start <- lapply(passes$location, (function (x) x[2]))
+passes$x_end <- lapply(passes$pass.end_location, (function (x) x[1]))
+passes$y_end <- lapply(passes$pass.end_location, (function (x) x[2]))
 # select relevant columns
 passes <-
   passes[, c(
     "team.name",
     "player.id",
     "pass.recipient.id",
-    "location1",
-    "location2",
-    "pass.end_location1",
-    "pass.end_location2"
+    "x_start",
+    "y_start",
+    "x_end",
+    "y_end"
   )]
 colnames(passes) <-
   c("team",
@@ -120,7 +120,7 @@ for (i in 1:2) {
     passes_ti[(
       passes_ti$passer_id %in% players[[i]]$player_id &
         passes_ti$recipient_id %in% players[[i]]$player_id
-    )]
+    ),]
   # add player info
   players[[i]] <-
     merge(players[[i]], lineup, by = "player_id")
@@ -152,7 +152,7 @@ for (i in 1:2) {
   pairs[[i]] <- pairs[[i]]
 }
 
-### Plotting ###
+### Plotting ----
 
 pitch_custom <- list(
   length = pitch_length,
