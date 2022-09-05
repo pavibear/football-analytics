@@ -137,5 +137,5 @@ def shot_plot(
               teams, loc='lower left', fontsize=8, frameon=False)
     plt.gca().add_artist(legend_xg)
 
-    plt.savefig(save_path+'xg_shot_plot.png',
+    plt.savefig(save_path+'python_xg_shot_plot_'+str(match_id)+'.png',
                 bbox_inches='tight')

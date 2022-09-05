@@ -4,16 +4,15 @@ library(ggplot2)
 library(ggpubr)
 library(ggsoccer)
 library(grid)
-library(rjson)
-library(StatsBombR)
 library(tidyr)
-library(rjson)
 
 rm(list = ls())
 
-### Declaring constants ###
+source("helpers.r")
 
-# pitch dimensions
+### Declaring constants ----
+
+match_id = 3795506
 pitch_length <- 105
 pitch_width <- 68
 # elimination constants in terms of share of total passes and passes or receptions
@@ -25,33 +24,22 @@ incl_recipients <- 1
 
 ### Import data ----
 
-match_id = 3788750
-
-comp <- FreeCompetitions()
-matches <- FreeMatches(comp)
-row_nr = which(matches[,1] == match_id)
-match <- get.matchFree(matches[row_nr,])
-lineup <- get.lineupsFree(matches[row_nr,])
-lineup <- rbind(lineup$lineup[[1]], lineup$lineup[[2]])
+match <- load_match(match_id)
+lineup <- load_lineup(match_id)
 teams <- unique(match$team.name)
 
 ### Extract passing information ----
 
 # filter events to get passes only
 passes <- match[match$type.name == "Pass", ]
-# unlist location info
-passes$x_start <- lapply(passes$location, (function (x) x[1]))
-passes$y_start <- lapply(passes$location, (function (x) x[2]))
-passes$x_end <- lapply(passes$pass.end_location, (function (x) x[1]))
-passes$y_end <- lapply(passes$pass.end_location, (function (x) x[2]))
 # select relevant columns
 passes <-
   passes[, c(
     "team.name",
     "player.id",
     "pass.recipient.id",
-    "x_start",
-    "y_start",
+    "x",
+    "y",
     "x_end",
     "y_end"
   )]
@@ -154,20 +142,8 @@ for (i in 1:2) {
 
 ### Plotting ----
 
-pitch_custom <- list(
-  length = pitch_length,
-  width = pitch_width,
-  penalty_box_length = 16.5,
-  penalty_box_width = 16.5 * 2 + 7.32,
-  six_yard_box_length = 5.5,
-  six_yard_box_width = 5.5 * 2 + 7.32,
-  penalty_spot_distance = 11,
-  goal_width = 7.32,
-  origin_x = 0,
-  origin_y = 0
-)
-# aspect_ratio pitch_length/pitch_width does not result in correct scales with theme_pitch, unclear why?
-pitch_ratio = 1.46
+# load pitch measures
+pitch_custom <- pitch_measures(pitch_length, pitch_width)
 # factors to shift segments for better visibility
 length_factor = 2
 offset_factor = 0.5
