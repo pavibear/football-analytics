@@ -9,7 +9,7 @@ Does not include penalties and own goals\
 
 ### Pass clusters (in r)
 Adjustment of nr_clusters might be required depending on the number of total passes\
-Careful: the starting configuration for the clusters depends on the random seed, repeated runs create different plots
+Careful: the starting configuration for the clusters depends on the random seed, repeated runs create different plots\
 ![r_pass_clusters_3788750](https://user-images.githubusercontent.com/41541395/193134622-59564dd0-b178-46ad-b6da-1117c495880b.png)
 
 ### Passing network (in r)
